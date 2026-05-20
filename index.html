@@ -7,15 +7,16 @@
 <meta name="description" content="Join us to celebrate Anthony's 80th birthday — a luncheon on Sunday, 5 July 2026 at The Homestead Venue, Plumstead, Cape Town." />
 
 <!-- ===================================================================
-     CONFIGURATION  —  set your n8n webhook URL here
-     RSVPs are POSTed as JSON to this URL. Leave blank ("") to fall back
-     to email / WhatsApp so responses still reach you with no backend.
+     CONFIGURATION
+     RSVPs are sent to RSVP_WEBHOOK_URL — your Google Apps Script /exec URL,
+     which writes each reply to your Google Sheet. Leave it blank ("") to
+     fall back to email / WhatsApp so responses still reach you with no backend.
      =================================================================== -->
 <script>
   window.INVITE_CONFIG = {
-    RSVP_WEBHOOK_URL: "https://script.google.com/macros/s/AKfycbwo8ivi7fqhdr9aaQ9U88lZuU4XOEva0xfVDqmYvNbM96pmWShWIw9RdAN6wtLBfLtX/exec",                       // Google Apps Script /exec URL, or e.g. "https://n8n.yourdomain.com/webhook/anthony-rsvp"
-    FALLBACK_EMAIL:   "antdavison@gmail.com", // used if no webhook is set / it fails
-    FALLBACK_WHATSAPP:"+27828946009",                        // e.g. "27821234567" (no + or spaces) — optional
+    RSVP_WEBHOOK_URL: "https://script.google.com/macros/s/AKfycbwo8ivi7fqhdr9aaQ9U88lZuU4XOEva0xfVDqmYvNbM96pmWShWIw9RdAN6wtLBfLtX/exec", // Google Apps Script web-app URL (ends in /exec)
+    FALLBACK_EMAIL:   "antdavison@gmail.com", // used only if the script is unset / unreachable
+    FALLBACK_WHATSAPP:"+27828946008",          // any format — non-digits are stripped automatically
     RSVP_BY:          "Sunday, 31 May 2026"     // RSVP deadline shown on the page
   };
 </script>
@@ -66,7 +67,6 @@
     overflow:hidden;
     position:relative;
   }
-  /* Decorative inner gold frame */
   .frame{
     position:relative;
     margin:14px;
@@ -82,7 +82,6 @@
     pointer-events:none;
   }
 
-  /* ---------- header ---------- */
   .eyebrow{
     text-align:center;
     font-family:var(--serif-body);
@@ -111,17 +110,16 @@
   .ornament .rule.r{background:linear-gradient(90deg, var(--gold), var(--gold-soft), transparent);}
   .ornament .dot{width:5px;height:5px;border:1px solid var(--gold); transform:rotate(45deg);}
 
-  /* ---------- photo ---------- */
   .portrait-wrap{ text-align:center; margin:10px 0 6px;}
   .portrait{
     width:230px; height:280px;
     margin:0 auto;
-    border-radius:140px 140px 140px 140px / 160px 160px 120px 120px; /* arched top */
+    border-radius:140px 140px 140px 140px / 160px 160px 120px 120px;
     background:linear-gradient(160deg,#F1E8D4,#E5D6B6);
     border:2px solid var(--gold);
     box-shadow:0 10px 26px rgba(120,90,40,.20), 0 0 0 8px var(--paper), 0 0 0 9px var(--gold-soft);
     object-fit:cover;
-    object-position:center 28%;
+    object-position:center 30%;
     display:block;
     position:relative;
   }
@@ -138,7 +136,6 @@
   .portrait-fallback .mono{font-family:var(--serif-display); font-size:74px; font-weight:600; line-height:1;}
   .portrait-fallback small{font-family:var(--serif-body); letter-spacing:.18em; text-transform:uppercase; font-size:10px; color:var(--muted); margin-top:8px;}
 
-  /* ---------- titles ---------- */
   h1.name{
     font-family:var(--serif-display);
     text-align:center;
@@ -179,7 +176,6 @@
     margin:14px auto 0;
   }
 
-  /* ---------- details ---------- */
   .details{
     margin:26px auto 6px;
     max-width:30em;
@@ -208,7 +204,6 @@
   }
   .btn-ghost:hover{background:var(--gold); color:#fff; border-color:var(--gold);}
 
-  /* ---------- RSVP ---------- */
   .rsvp{
     margin:30px -6px 0;
     background:linear-gradient(180deg,#FFFDF8, #FBF5E8);
@@ -276,7 +271,6 @@
   .err{display:none; color:#9b3b2f; background:#fbeae6; border:1px solid #e8c4bb; border-radius:6px; padding:10px 12px; margin-bottom:14px; font-size:15px;}
   .err.show{display:block;}
 
-  /* success */
   .thanks{display:none; text-align:center; padding:18px 6px 6px;}
   .thanks.show{display:block; animation:fade .3s ease;}
   .thanks .seal{
@@ -291,12 +285,6 @@
   footer{ text-align:center; margin:26px auto 0; }
   footer .sig{font-family:var(--script); font-size:30px; color:var(--gold); }
   footer .small{font-size:13px; color:var(--muted); letter-spacing:.05em; margin-top:2px;}
-
-  .placeholder-tag{
-    text-align:center; font-size:12px; color:#a98a3f; background:#fcf5e4;
-    border:1px dashed var(--gold-soft); border-radius:4px; padding:6px 10px;
-    max-width:30em; margin:0 auto 4px; letter-spacing:.02em;
-  }
 </style>
 </head>
 <body>
@@ -310,8 +298,8 @@
         <span class="rule"></span><span class="dot"></span><span class="rule r"></span>
       </div>
 
-      <!-- PHOTO: drop a file named anthony.jpg into the images/ folder beside this page.
-           Until then, an elegant monogram placeholder is shown. -->
+      <!-- PHOTO: images/anthony.jpg sits beside this page. If it's ever missing,
+           an elegant monogram placeholder is shown instead. -->
       <div class="portrait-wrap">
         <img class="portrait" src="images/anthony.jpg" alt="Anthony"
              onerror="this.style.display='none'; document.getElementById('portraitFallback').style.display='flex';" />
@@ -448,7 +436,6 @@
 <script>
 (function(){
   var cfg = window.INVITE_CONFIG || {};
-  // reflect deadline text
   if (cfg.RSVP_BY){ var by=document.getElementById('rsvpBy'); if(by) by.textContent = cfg.RSVP_BY; }
 
   var form   = document.getElementById('rsvpForm');
@@ -458,13 +445,11 @@
   var thanks = document.getElementById('thanks');
   var choiceWrap = document.getElementById('attendChoice');
 
-  // selectable radio cards + show/hide guest details
   choiceWrap.querySelectorAll('label').forEach(function(l){
     l.addEventListener('click', function(){
       choiceWrap.querySelectorAll('label').forEach(function(x){x.classList.remove('sel');});
       l.classList.add('sel');
-      var val = l.getAttribute('data-val');
-      if(val==='yes'){ guestExtra.classList.add('show'); }
+      if(l.getAttribute('data-val')==='yes'){ guestExtra.classList.add('show'); }
       else { guestExtra.classList.remove('show'); }
     });
   });
@@ -489,7 +474,7 @@
       name: name,
       email: email,
       phone: form.phone.value.trim(),
-      attending: attending,                                  // "yes" | "no"
+      attending: attending,
       guests: attending==='yes' ? (parseInt(form.guests.value,10)||1) : 0,
       dietary: attending==='yes' ? form.dietary.value.trim() : "",
       message: form.message.value.trim(),
@@ -514,7 +499,7 @@
     }
 
     function fallback(){
-      // No webhook (or it failed): use email / WhatsApp so the RSVP still reaches the family.
+      // No endpoint (or it failed): use email / WhatsApp so the RSVP still reaches the family.
       var lines = [
         'RSVP — Anthony’s 80th Birthday Luncheon',
         '',
@@ -527,8 +512,9 @@
         'Message: ' + (payload.message || '-')
       ].join('\n');
 
-      if(cfg.FALLBACK_WHATSAPP){
-        window.open('https://wa.me/' + cfg.FALLBACK_WHATSAPP + '?text=' + encodeURIComponent(lines), '_blank');
+      var wa = (cfg.FALLBACK_WHATSAPP || '').replace(/[^0-9]/g,'');  // wa.me wants digits only: drop the "+", no "00"
+      if(wa){
+        window.open('https://wa.me/' + wa + '?text=' + encodeURIComponent(lines), '_blank');
       } else {
         var subj = 'RSVP — Anthony’s 80th (' + payload.name + ')';
         window.location.href = 'mailto:' + (cfg.FALLBACK_EMAIL||'') + '?subject=' + encodeURIComponent(subj) + '&body=' + encodeURIComponent(lines);
@@ -538,10 +524,23 @@
 
     if(!url){ fallback(); return; }
 
-    // Google Apps Script web apps can't answer a CORS preflight, so for those we
-    // send a "simple" request (text/plain) which the browser allows without one.
-    // n8n and other webhooks keep receiving JSON as normal.
-    var isGAS = /script\.google\.com/.test(url);
+    // The RSVP is sent to your Google Apps Script web app, which appends a row to
+    // your Google Sheet. Apps Script doesn't return CORS headers a browser may read,
+    // so we send a "no-cors" request: the row is still written and the response is
+    // simply opaque — so a resolved fetch means the RSVP was delivered.
     fetch(url, {
       method:'POST',
-      headers:{ 'Content-Type': isGAS ? 'text/
+      mode:'no-cors',
+      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    }).then(function(){
+      succeed();
+    }).catch(function(){
+      // only a genuine network failure lands here
+      fallback();
+    });
+  });
+})();
+</script>
+</body>
+</html>
